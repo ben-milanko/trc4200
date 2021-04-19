@@ -53,6 +53,8 @@ scaled_shape = (int(aerial_image.shape[0] * scale),
 aerial_image = cv2.resize(aerial_image, scaled_shape)
 
 cap = cv2.VideoCapture(play.url)
+
+homography = None
 while True:
     ret, frame = cap.read()
     cv2.resizeWindow(stream_window_name, 1280, 720)
@@ -71,6 +73,10 @@ while True:
 
     if cv2.waitKey(20) & 0xFF == ord('q'):
         break
+
+if homography is not None:
+    print(f"Transformation matrix for <{url}>:")
+    print(homography)
 
 cap.release()
 cv2.destroyAllWindows()
