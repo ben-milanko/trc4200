@@ -17,6 +17,14 @@ frame = tk.Frame(master)
 frame.grid(row=0, column=0, sticky=tk.NSEW)
 
 
+def undistort_img(camera_matrix, dist_coeffs, input_img):
+    h, w, _ = input_img.shape
+    dim = (w, h)
+    new_cam, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, dist_coeffs, dim, 0.15, dim)
+    map_x, map_y = cv2.initUndistortRectifyMap(camera_matrix, dist_coeffs, None, new_cam, dim, cv2.CV_32FC1)
+    return cv2.remap(img, map_x, map_y, cv2.INTER_LINEAR)
+
+
 def callback(val):
     f_x = entry_f_x.get()
     c_x = entry_c_x.get()
@@ -39,10 +47,7 @@ def callback(val):
     )
     print(camera_matrix, dist_coeffs)
 
-    dim = (img_width, img_height)
-    new_cam, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, dist_coeffs, dim, 0.15, dim)
-    mapx, mapy = cv2.initUndistortRectifyMap(camera_matrix, dist_coeffs, None, new_cam, dim, cv2.CV_32FC1)
-    t_frame = cv2.remap(img, mapx, mapy, cv2.INTER_LINEAR)
+    t_frame = undistort_img(camera_matrix, dist_coeffs, img)
     cv2.imshow('Undistorted', t_frame)
     return True
 
