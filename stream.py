@@ -2,12 +2,21 @@ import cv2
 import numpy as np
 import pafy
 
-url = "https://youtu.be/1EiC9bvVGnk"
+# url = "https://youtu.be/1EiC9bvVGnk"
+url = "https://youtu.be/6aJXND_Lfk8"
 vid = pafy.new(url)
 play = vid.getbest()
 
 stream_window_name = 'Stream'
 reference_window_name = 'Reference'
+
+do_undistort = False
+camera_matrix = np.array([
+    [0.2, 0.0, 0.2],
+    [0.0, 0.2, 0.2],
+    [0.0, 0.0, 0.0]
+])
+distortion_coeffs = [0.1, 0.1, 0.1, 0.1]
 
 clicked_pts_stream = []
 clicked_pts_reference = []
@@ -57,6 +66,11 @@ cap = cv2.VideoCapture(play.url)
 homography = None
 while True:
     ret, frame = cap.read()
+    cv2.imwrite('frame.png', frame)
+
+    if do_undistort:
+        frame = cv2.undistort(frame, camera_matrix, distortion_coeffs)
+
     cv2.resizeWindow(stream_window_name, 1280, 720)
     cv2.imshow(stream_window_name, draw_points(frame, clicked_pts_stream))
 
