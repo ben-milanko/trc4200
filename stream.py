@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import pafy
+from undistort import undistort_img
 
 # url = "https://youtu.be/1EiC9bvVGnk"
 url = "https://youtu.be/6aJXND_Lfk8"
@@ -10,13 +11,13 @@ play = vid.getbest()
 stream_window_name = 'Stream'
 reference_window_name = 'Reference'
 
-do_undistort = False
+do_undistort = True
 camera_matrix = np.array([
-    [0.2, 0.0, 0.2],
-    [0.0, 0.2, 0.2],
-    [0.0, 0.0, 0.0]
+    [132, 0, 960],
+    [0, 74.25, 540],
+    [0, 0, 1]
 ])
-distortion_coeffs = [0.1, 0.1, 0.1, 0.1]
+distortion_coeffs = np.array([-2.85714e-3, 5.643e-6, 0, 0])
 
 clicked_pts_stream = []
 clicked_pts_reference = []
@@ -56,9 +57,10 @@ cv2.setMouseCallback(reference_window_name, on_click_ref)
 # open reference image
 aerial_image = cv2.imread('aerial.png')
 target_width = 1280
-scale = 1280 / aerial_image.shape[0]
+scale = 1280 / aerial_image.shape[1]
 scaled_shape = (int(aerial_image.shape[0] * scale),
                 int(aerial_image.shape[1] * scale))
+print(scaled_shape)
 aerial_image = cv2.resize(aerial_image, scaled_shape)
 
 cap = cv2.VideoCapture(play.url)
@@ -69,7 +71,7 @@ while True:
     cv2.imwrite('frame.png', frame)
 
     if do_undistort:
-        frame = cv2.undistort(frame, camera_matrix, distortion_coeffs)
+        frame = undistort_img(camera_matrix, distortion_coeffs, frame)
 
     cv2.resizeWindow(stream_window_name, 1280, 720)
     cv2.imshow(stream_window_name, draw_points(frame, clicked_pts_stream))
@@ -85,7 +87,11 @@ while True:
         transformed = cv2.warpPerspective(frame, homography, (1280, 1280))
         cv2.imshow('trans', transformed)
 
-    if cv2.waitKey(20) & 0xFF == ord('q'):
+    key_val = cv2.waitKey(20)
+    if key_val & 0xFF == ord('r'):
+        clicked_pts_stream.clear()
+        clicked_pts_reference.clear()
+    elif key_val & 0xFF == ord('q'):
         break
 
 if homography is not None:
