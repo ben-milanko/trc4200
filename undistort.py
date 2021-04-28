@@ -2,27 +2,13 @@ import cv2
 import numpy as np
 import tkinter as tk
 
-img = cv2.imread('frame.png')
-img_height, img_width, _ = img.shape
-
-max_f = 200
-
-master = tk.Tk()
-master.geometry('600x180')
-master.title("Distortion Parameters")
-tk.Grid.rowconfigure(master, 0, weight=1)
-tk.Grid.columnconfigure(master, 0, weight=1)
-
-frame = tk.Frame(master)
-frame.grid(row=0, column=0, sticky=tk.NSEW)
-
 
 def undistort_img(camera_matrix, dist_coeffs, input_img):
     h, w, _ = input_img.shape
     dim = (w, h)
     new_cam, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, dist_coeffs, dim, 0.15, dim)
     map_x, map_y = cv2.initUndistortRectifyMap(camera_matrix, dist_coeffs, None, new_cam, dim, cv2.CV_32FC1)
-    return cv2.remap(img, map_x, map_y, cv2.INTER_LINEAR)
+    return cv2.remap(input_img, map_x, map_y, cv2.INTER_LINEAR)
 
 
 def callback(val):
@@ -35,7 +21,7 @@ def callback(val):
     p_1 = entry_p_1.get()
     p_2 = entry_p_2.get()
 
-    f_y = img_height/img_width * f_x
+    f_y = img_height / img_width * f_x
 
     camera_matrix = np.array([
         [f_x, 0.0, c_x],
@@ -53,6 +39,20 @@ def callback(val):
 
 
 if __name__ == '__main__':
+    img = cv2.imread('frame.png')
+    img_height, img_width, _ = img.shape
+
+    max_f = 200
+
+    master = tk.Tk()
+    master.geometry('600x180')
+    master.title("Distortion Parameters")
+    tk.Grid.rowconfigure(master, 0, weight=1)
+    tk.Grid.columnconfigure(master, 0, weight=1)
+
+    frame = tk.Frame(master)
+    frame.grid(row=0, column=0, sticky=tk.NSEW)
+
     tk.Label(frame, text='f_x').grid(row=0, column=0)
     tk.Label(frame, text='c_x').grid(row=0, column=2)
     tk.Label(frame, text='f_y').grid(row=1, column=0)

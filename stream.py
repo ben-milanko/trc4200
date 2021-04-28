@@ -68,7 +68,7 @@ cap = cv2.VideoCapture(play.url)
 homography = None
 while True:
     ret, frame = cap.read()
-    cv2.imwrite('frame.png', frame)
+    # cv2.imwrite('frame.png', frame)
 
     if do_undistort:
         frame = undistort_img(camera_matrix, distortion_coeffs, frame)
