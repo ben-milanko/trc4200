@@ -1,6 +1,15 @@
+import time
+import tkinter as tk
+
 import cv2
 import numpy as np
-import tkinter as tk
+import pafy
+
+from util import read_config_entry, write_config_entry
+
+camera_matrix, dist_coeffs = None, None
+
+CAM_NAME = 'square'
 
 
 def undistort_img(camera_matrix, dist_coeffs, input_img):
@@ -20,32 +29,37 @@ def callback(val):
     k_2 = entry_k_2.get()
     p_1 = entry_p_1.get()
     p_2 = entry_p_2.get()
+    k_3 = entry_k_3.get()
 
     f_y = img_height / img_width * f_x
-
+    global camera_matrix, dist_coeffs
     camera_matrix = np.array([
         [f_x, 0.0, c_x],
         [0.0, f_y, c_y],
         [0.0, 0.0, 1.0]
     ])
     dist_coeffs = np.array(
-        [k_1, k_2, p_1, p_2]
+        [k_1, k_2, p_1, p_2, k_3]
     )
-    print(camera_matrix, dist_coeffs)
 
-    t_frame = undistort_img(camera_matrix, dist_coeffs, img)
-    cv2.imshow('Undistorted', t_frame)
+    write_config_entry(CAM_NAME, dist_corr=(camera_matrix.tolist(), dist_coeffs.tolist()))
+
     return True
 
 
 if __name__ == '__main__':
-    img = cv2.imread('frame.png')
+    config = read_config_entry(CAM_NAME)
+    vid = pafy.new(config['url'])
+    play = vid.getbest()
+    cap = cv2.VideoCapture(play.url)
+
+    ret, img = cap.read()
     img_height, img_width, _ = img.shape
 
     max_f = 200
 
     master = tk.Tk()
-    master.geometry('600x180')
+    master.geometry('600x240')
     master.title("Distortion Parameters")
     tk.Grid.rowconfigure(master, 0, weight=1)
     tk.Grid.columnconfigure(master, 0, weight=1)
@@ -61,6 +75,7 @@ if __name__ == '__main__':
     tk.Label(frame, text='k_2').grid(row=2, column=2)
     tk.Label(frame, text='p_1').grid(row=3, column=0)
     tk.Label(frame, text='p_2').grid(row=3, column=2)
+    tk.Label(frame, text='k_3').grid(row=4, column=0)
     entry_f_x = tk.Scale(frame, from_=10, to=max_f, orient=tk.HORIZONTAL, command=callback)
     entry_c_x = tk.Scale(frame, from_=0, to=img_width, orient=tk.HORIZONTAL, command=callback)
     # entry_f_y = tk.Scale(frame, from_=0, to=max_f)
@@ -69,6 +84,7 @@ if __name__ == '__main__':
     entry_k_2 = tk.Scale(frame, from_=-3e-6, to=3e-6, orient=tk.HORIZONTAL, resolution=1e-9, command=callback)
     entry_p_1 = tk.Scale(frame, from_=-0.1, to=0.1, orient=tk.HORIZONTAL, resolution=0.001, command=callback)
     entry_p_2 = tk.Scale(frame, from_=-0.1, to=0.1, orient=tk.HORIZONTAL, resolution=0.001, command=callback)
+    entry_k_3 = tk.Scale(frame, from_=-3e-8, to=3e-8, orient=tk.HORIZONTAL, resolution=1e-11, command=callback)
 
     for row in range(4):
         tk.Grid.rowconfigure(frame, row, weight=1)
@@ -84,9 +100,15 @@ if __name__ == '__main__':
     entry_k_2.grid(row=2, column=3, sticky=tk.EW)
     entry_p_1.grid(row=3, column=1, sticky=tk.EW)
     entry_p_2.grid(row=3, column=3, sticky=tk.EW)
+    entry_k_3.grid(row=4, column=1, sticky=tk.EW)
 
     entry_c_x.set(img_width / 2)
     entry_c_y.set(img_height / 2)
     entry_f_x.set(max_f / 2)
 
-    master.mainloop()
+    while True:
+        ret, img = cap.read()
+        time.sleep(0.01)
+        master.update()
+        t_frame = undistort_img(camera_matrix, dist_coeffs, img)
+        cv2.imshow('Undistorted', t_frame)

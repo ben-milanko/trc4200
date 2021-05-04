@@ -1,23 +1,20 @@
 import cv2
 import numpy as np
 import pafy
-from undistort import undistort_img
 
-# url = "https://youtu.be/1EiC9bvVGnk"
-url = "https://youtu.be/6aJXND_Lfk8"
+from undistort import undistort_img
+from util import read_config_entry, write_config_entry
+
+CAM_NAME = 'pizzeria'
+
+cam_config = read_config_entry(CAM_NAME)
+
+url = cam_config['url']
 vid = pafy.new(url)
 play = vid.getbest()
 
 stream_window_name = 'Stream'
 reference_window_name = 'Reference'
-
-do_undistort = True
-camera_matrix = np.array([
-    [132, 0, 960],
-    [0, 74.25, 540],
-    [0, 0, 1]
-])
-distortion_coeffs = np.array([-2.85714e-3, 5.643e-6, 0, 0])
 
 clicked_pts_stream = []
 clicked_pts_reference = []
@@ -65,12 +62,13 @@ aerial_image = cv2.resize(aerial_image, scaled_shape)
 
 cap = cv2.VideoCapture(play.url)
 
-homography = None
+homography = np.array(cam_config['transform']) if cam_config['transform'] else None
 while True:
     ret, frame = cap.read()
-    # cv2.imwrite('frame.png', frame)
 
-    if do_undistort:
+    if corrections := cam_config['correction']:
+        camera_matrix = np.array(corrections['camMatrix'])
+        distortion_coeffs = np.array(corrections['distCoeffs'])
         frame = undistort_img(camera_matrix, distortion_coeffs, frame)
 
     cv2.resizeWindow(stream_window_name, 1280, 720)
@@ -84,7 +82,8 @@ while True:
         src_pts = np.array(clicked_pts_stream[:pts_len])
         dst_pts = np.array(clicked_pts_reference[:pts_len])
         homography, mask = cv2.findHomography(src_pts, dst_pts)
-        transformed = cv2.warpPerspective(frame, homography, (1280, 1280))
+    if homography is not None:
+        transformed = cv2.warpPerspective(frame, homography, scaled_shape)
         cv2.imshow('trans', transformed)
 
     key_val = cv2.waitKey(20)
@@ -95,8 +94,7 @@ while True:
         break
 
 if homography is not None:
-    print(f"Transformation matrix for <{url}>:")
-    print(homography)
+    write_config_entry(CAM_NAME, transform=homography.tolist())
 
 cap.release()
 cv2.destroyAllWindows()
