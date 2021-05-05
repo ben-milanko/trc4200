@@ -9,6 +9,8 @@ import {AppLoaderPlugin} from "@pixi/loaders";
 // Sprite is our image on the stage
 import {Sprite} from "@pixi/sprite";
 
+import bunny from "../resources/assets/bunny.png";
+
 Renderer.registerPlugin("batch", BatchRenderer);
 
 Application.registerPlugin(TickerPlugin);
@@ -23,7 +25,7 @@ const app = new Application({
 document.body.appendChild(app.view); // Create Canvas tag in the body
 
 // Load the logo
-app.loader.add("car", "./assets/bunny.png");
+app.loader.add("car", bunny);
 app.loader.load(() => {
     const carSprite = Sprite.from("car");
     carSprite.anchor.set(0.5); // We want to rotate our sprite relative to the center, so 0.5
