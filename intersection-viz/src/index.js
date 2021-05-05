@@ -1,42 +1,46 @@
 // Import Application class that is the main part of our PIXI project
-import { Application } from '@pixi/app'
+import {Application} from "@pixi/app";
 
 // In order that PIXI could render things we need to register appropriate plugins
-import { Renderer } from '@pixi/core' // Renderer is the class that is going to register plugins
-
-import { BatchRenderer } from '@pixi/core' // BatchRenderer is the "plugin" for drawing sprites
-Renderer.registerPlugin('batch', BatchRenderer)
-
-import { TickerPlugin } from '@pixi/ticker' // TickerPlugin is the plugin for running an update loop (it's for the application class)
-Application.registerPlugin(TickerPlugin)
-
+import {BatchRenderer, Renderer} from "@pixi/core"; // BatchRenderer is the "plugin" for drawing sprites // Renderer is the class that is going to register plugins
+import {TickerPlugin} from "@pixi/ticker"; // TickerPlugin is the plugin for running an update loop (it's for the application class)
 // And just for convenience let's register Loader plugin in order to use it right from Application instance like app.loader.add(..) etc.
-import { AppLoaderPlugin } from '@pixi/loaders'
-Application.registerPlugin(AppLoaderPlugin)
-
+import {AppLoaderPlugin} from "@pixi/loaders";
 // Sprite is our image on the stage
-import { Sprite } from '@pixi/sprite'
+import {Sprite} from "@pixi/sprite";
+
+Renderer.registerPlugin("batch", BatchRenderer);
+
+Application.registerPlugin(TickerPlugin);
+
+Application.registerPlugin(AppLoaderPlugin);
 
 // App with width and height of the page
 const app = new Application({
-	width: window.innerWidth,
-	height: window.innerHeight
-})
-document.body.appendChild(app.view) // Create Canvas tag in the body
+    width: window.innerWidth,
+    height: window.innerHeight
+});
+document.body.appendChild(app.view); // Create Canvas tag in the body
 
 // Load the logo
-app.loader.add('logo', './assets/logo.png')
+app.loader.add("car", "./assets/bunny.png");
 app.loader.load(() => {
-	const sprite = Sprite.from('logo')
-	sprite.anchor.set(0.5) // We want to rotate our sprite relative to the center, so 0.5
-	app.stage.addChild(sprite)
+    const carSprite = Sprite.from("car");
+    carSprite.anchor.set(0.5); // We want to rotate our sprite relative to the center, so 0.5
+    app.stage.addChild(carSprite);
 
-	// Position the sprite at the center of the stage
-	sprite.x = app.screen.width * 0.5
-	sprite.y = app.screen.height * 0.5
+    // Position the sprite at the center of the stage
+    carSprite.x = app.screen.width * 0.5;
+    carSprite.y = app.screen.height * 0.5;
 
-	// Put the rotating function into the update loop
-	app.ticker.add(delta => {
-		sprite.rotation += 0.02 * delta
-	})
-})
+    const carUpdate = function (delta) {
+        carSprite.rotation += 0.8 * (Math.random() - 0.5) * delta;
+        carSprite.x += 10 * (Math.random() - 0.5) * delta;
+        carSprite.y += 10 * (Math.random() - 0.5) * delta;
+        carSprite.width += 30 * (Math.random() - 0.48) * delta;
+        carSprite.height += 30 * (Math.random() - 0.48) * delta;
+    };
+
+    // Put the rotating function into the update loop
+    app.ticker.add(carUpdate);
+});

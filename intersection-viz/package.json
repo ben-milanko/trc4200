@@ -12,13 +12,19 @@
   "author": "Conroy Cheers",
   "license": "ISC",
   "dependencies": {
-    "pixi.js": "^6.0.2"
+    "@pixi/app": "^6.0.2",
+    "@pixi/core": "^6.0.2",
+    "@pixi/loaders": "^6.0.2",
+    "@pixi/sprite": "^6.0.2",
+    "@pixi/ticker": "^6.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.14.0",
+    "@babel/eslint-parser": "^7.13.14",
     "@babel/preset-env": "^7.14.1",
     "babel-loader": "^8.2.2",
     "copy-webpack-plugin": "^8.1.1",
+    "eslint": "^7.25.0",
     "html-webpack-plugin": "^5.3.1",
     "webpack": "^5.36.2",
     "webpack-cli": "^4.6.0",
