@@ -1,0 +1,27 @@
+{
+  "name": "intersection-viz",
+  "version": "1.0.0",
+  "description": "2D visualisation for traffic intersection",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "production": "webpack --mode production --config webpack.config.prod.js",
+    "build": "webpack --mode development --config webpack.config.dev.js",
+    "start": "webpack serve --config webpack.config.dev.js"
+  },
+  "author": "Conroy Cheers",
+  "license": "ISC",
+  "dependencies": {
+    "pixi.js": "^6.0.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.14.0",
+    "@babel/preset-env": "^7.14.1",
+    "babel-loader": "^8.2.2",
+    "copy-webpack-plugin": "^8.1.1",
+    "html-webpack-plugin": "^5.3.1",
+    "webpack": "^5.36.2",
+    "webpack-cli": "^4.6.0",
+    "webpack-dev-server": "^4.0.0-beta.2"
+  }
+}
