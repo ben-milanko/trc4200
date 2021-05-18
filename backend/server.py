@@ -2,12 +2,10 @@ import asyncio
 import collections
 import enum
 import logging
+import numpy as np
 import random
 import socket
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
-
-import numpy as np
 from dataclasses_json import dataclass_json, LetterCase
 from starlette.applications import Starlette
 from starlette.endpoints import WebSocketEndpoint
@@ -15,6 +13,7 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route, WebSocketRoute
 from starlette.types import ASGIApp, Scope, Receive, Send
 from starlette.websockets import WebSocket
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +115,7 @@ class Room:
     async def broadcast_tracking(self, objects: Dict[int, TrackedObject]):
         for websocket in self._users.values():
             await websocket.send_json(
-                {"type": "TRACKING", "data": {k: o.to_json() for k, o in objects.items()}}
+                {"type": "TRACKING", "data": {k: o.to_dict() for k, o in objects.items()}}
             )
 
     async def broadcast_user_joined(self, user_id: str):
