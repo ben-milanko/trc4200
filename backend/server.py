@@ -1,9 +1,14 @@
 import asyncio
-import json
+import collections
+import enum
 import logging
-from typing import Dict, List, Optional
+import random
+import socket
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
 
-import websockets
+import numpy as np
+from dataclasses_json import dataclass_json, LetterCase
 from starlette.applications import Starlette
 from starlette.endpoints import WebSocketEndpoint
 from starlette.responses import PlainTextResponse
@@ -12,6 +17,28 @@ from starlette.types import ASGIApp, Scope, Receive, Send
 from starlette.websockets import WebSocket
 
 logger = logging.getLogger(__name__)
+
+
+class ObjectType(enum.IntEnum):
+    PERSON = 0
+    BICYCLE = 1
+    CAR = 2
+    MOTORCYCLE = 3
+    BUS = 5
+    TRUCK = 7
+    TRAFFIC_LIGHT = 9
+    FIRE_HYDRANT = 10
+    STOP_SIGN = 11
+    PARKING_METER = 12
+
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass
+class TrackedObject:
+    location: Tuple[int, int]
+    rotation: int
+    vel: Tuple[int, int]
+    obj_type: ObjectType
 
 
 class Room:
@@ -84,6 +111,12 @@ class Room:
         for websocket in self._users.values():
             await websocket.send_json(
                 {"type": "MESSAGE", "data": {"user_id": user_id, "msg": msg}}
+            )
+
+    async def broadcast_tracking(self, objects: Dict[int, TrackedObject]):
+        for websocket in self._users.values():
+            await websocket.send_json(
+                {"type": "TRACKING", "data": {k: o.to_json() for k, o in objects.items()}}
             )
 
     async def broadcast_user_joined(self, user_id: str):
@@ -174,37 +207,79 @@ class Stream(WebSocketEndpoint):
 
 
 class VehicleTracker:
-    vehicles: Dict
-    socket: Optional[websockets.ClientConnection]
+    MAX_HISTORY_POINTS = 10
+
+    _vehicle_history: Dict[int, List[TrackedObject]]
+    fake_mode: bool
+    socket_reader: Optional[asyncio.StreamReader]
+    socket_writer: Optional[asyncio.StreamWriter]
     room: Optional[Room]
 
     def __init__(self, room: Room):
-        self.vehicles = {}
-        self.socket = None
+        self._vehicle_history = collections.defaultdict(list)
+        self.fake_mode = False
+        self.socket_reader = None
+        self.socket_writer = None
         self._room = room
 
-    async def connect(self, uri):
+    def update_history(self, vehicle_id: int, obj: TrackedObject):
+        self._vehicle_history[vehicle_id].append(obj)
+        if len(self._vehicle_history[vehicle_id]) > self.MAX_HISTORY_POINTS:
+            # remove old point
+            self._vehicle_history[vehicle_id].pop(0)
+
+    @property
+    def current_vehicles(self) -> Dict[int, TrackedObject]:
+        return {key: objs[-1] for key, objs in self._vehicle_history.items()}
+
+    async def connect(self, host: str, port: int):
+        if self.fake_mode:
+            return
+
         try:
-            self.socket = await websockets.connect(uri)
-        except websockets.ConnectionClosed:
-            await asyncio.sleep(3)
-            print("Not able to connect.. Retrying in 3 seconds")
-            self.socket = await websockets.connect(uri)
+            self.socket_reader, self.socket_writer = await asyncio.open_connection(host, port)
+            self.socket_writer.write(bytes("", "utf-8"))
+            await self.socket_writer.drain()
+        except socket.error:
+            logger.warning("Not able to connect. Using fake data")
+            self.fake_mode = True
 
     async def close(self):
-        await self.socket.close()
+        if self.fake_mode:
+            return
+
+        self.socket_writer.close()
+        await self.socket_writer.wait_closed()
+        self.socket_writer = None
+        self.socket_reader = None
 
     async def listen(self):
         while True:
-            data = json.loads(await self.socket.recv())
-            print(data)
-            await self._room.broadcast_message('0', json.dumps(data))
+            if self.fake_mode is False:
+                data = await self.socket_reader.read(2048)
+                received = np.frombuffer(data)
+                received = received.reshape((len(received) / 6, 6))
+                print(received)
+                # TODO populate object_data
+                object_data = {}
+            else:
+                new_loc = (random.randint(-200, 200), 300 + random.randint(-200, 200))
+                object_data = {
+                    1: TrackedObject(location=(450, 300), rotation=0, vel=(0, 0), obj_type=ObjectType.CAR),
+                    2: TrackedObject(location=new_loc, rotation=0, vel=(0, 0), obj_type=ObjectType.PERSON)
+                }
+
+            for k, obj in object_data.items():
+                self.update_history(k, obj)
+
+            await self._room.broadcast_tracking(self.current_vehicles)
+            await asyncio.sleep(0.1)
 
 
 async def init_tracker():
     loop = asyncio.get_event_loop()
     tracker = VehicleTracker(global_room)
-    await tracker.connect('ws://127.0.0.1:6845')
+    await tracker.connect('14.137.209.102', 7777)
     loop.create_task(tracker.listen())
 
 

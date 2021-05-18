@@ -10,12 +10,10 @@
 pip install -r requirements.txt
 ```
 
-3. Run `test_server.py` (because the real server isn't up yet)
-
-4. Run the server using uvicorn:
+3. Run the server using uvicorn:
 
 ```shell
 uvicorn server:app
 ```
 
-5. Run `test_client.py` (because the real client isn't done yet).
+4. Run `test_client.py` (because the real client isn't done yet).
