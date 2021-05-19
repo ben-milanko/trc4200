@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import websockets.exceptions
 from dataclasses_json import dataclass_json, LetterCase
 from starlette.applications import Starlette
 from starlette.endpoints import WebSocketEndpoint
@@ -298,11 +299,12 @@ class VehicleTracker:
 
                 await self._room.broadcast_tracking(self.current_vehicles, elapsed)
                 await asyncio.sleep(0.2)
-            except Exception as e:
-                logger.error("Socket read failed:", e)
+            except websockets.exceptions.ConnectionClosed:
+                logger.exception("A client connection was interrupted. Reconnecting...")
                 # Attempt to reconnect
                 await self.close()
                 await self.connect(self.host, self.port)
+                logger.warning("Reconnected.")
 
 
 async def init_tracker():

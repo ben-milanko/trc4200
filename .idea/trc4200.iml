@@ -7,7 +7,7 @@
       <excludeFolder url="file://$MODULE_DIR$/transform/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/backend/venv" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.9 (trc4200/backend)" jdkType="Python SDK" />
+    <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

@@ -14,6 +14,7 @@
   "dependencies": {
     "@pixi/app": "^6.0.2",
     "@pixi/core": "^6.0.2",
+    "@pixi/display": "^6.0.2",
     "@pixi/loaders": "^6.0.2",
     "@pixi/settings": "^6.0.2",
     "@pixi/sprite": "^6.0.2",
