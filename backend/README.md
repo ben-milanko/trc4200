@@ -16,4 +16,4 @@ pip install -r requirements.txt
 uvicorn server:app
 ```
 
-4. Run `test_client.py` (because the real client isn't done yet).
+4. Run `intersection-viz` (see `../intersection-viz/README.md` for details).
