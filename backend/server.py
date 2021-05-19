@@ -277,7 +277,7 @@ class VehicleTracker:
             try:
                 prev_time = new_time
                 new_time = datetime.now()
-                elapsed = (new_time - prev_time).total_seconds()
+                elapsed = (new_time - prev_time).total_seconds() or 0.1
                 if self.fake_mode is False:
                     data = await self.socket_reader.read(2048)
                     received = np.frombuffer(data)
