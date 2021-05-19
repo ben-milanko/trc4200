@@ -8,10 +8,51 @@
             margin: 0;
             overflow: hidden;
         }
+
+        .navbar {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #333;
+
+            font-family: "Helvetica Neue", "Arial", sans-serif;
+            font-size: 1.6em;
+            color: #fafafa;
+            text-align: center;
+        }
+
+        .navbar span {
+            display: block;
+            padding: 0.3em 0.3em;
+        }
+
+        #display {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .box {
+            display: flex;
+            flex-flow: column;
+            height: 100vh;
+        }
+
+        .box .row.navbar {
+            flex: none;
+        }
+
+        .box .row.content {
+            flex: 1 1 auto;
+        }
     </style>
 </head>
 <body>
-<div id="display">
+<div class="box">
+    <div class="row navbar">
+        <span>Traffic Visualiser</span>
+    </div>
+    <div class="row content" id="display">
+    </div>
 </div>
 </body>
 </html>

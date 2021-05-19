@@ -2,10 +2,14 @@ import asyncio
 import collections
 import enum
 import logging
-import numpy as np
+import math
 import random
 import socket
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
 from dataclasses_json import dataclass_json, LetterCase
 from starlette.applications import Starlette
 from starlette.endpoints import WebSocketEndpoint
@@ -13,7 +17,6 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route, WebSocketRoute
 from starlette.types import ASGIApp, Scope, Receive, Send
 from starlette.websockets import WebSocket
-from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +39,15 @@ class ObjectType(enum.IntEnum):
 class TrackedObject:
     location: Tuple[int, int]
     rotation: int
-    vel: Tuple[int, int]
+    vel: Tuple[float, float]
     obj_type: ObjectType
+
+    @classmethod
+    def from_np(cls, np_array: np.array):
+        [obj_id, x, y, rot, speed, typ, t_stamp] = np_array
+        vel = (speed * math.cos(rot), -speed * math.sin(rot))
+        return obj_id, cls(obj_type=ObjectType(int(typ)), location=(int(x), int(y)), vel=vel,
+                           rotation=math.pi / 2 - rot)
 
 
 class Room:
@@ -112,10 +122,11 @@ class Room:
                 {"type": "MESSAGE", "data": {"user_id": user_id, "msg": msg}}
             )
 
-    async def broadcast_tracking(self, objects: Dict[int, TrackedObject]):
+    async def broadcast_tracking(self, objects: Dict[int, TrackedObject], tick_time: float):
         for websocket in self._users.values():
             await websocket.send_json(
-                {"type": "TRACKING", "data": {k: o.to_dict() for k, o in objects.items()}}
+                {"type": "TRACKING", "data": {k: o.to_dict() for k, o in objects.items()},
+                 "tickTime": tick_time}
             )
 
     async def broadcast_user_joined(self, user_id: str):
@@ -213,6 +224,8 @@ class VehicleTracker:
     socket_reader: Optional[asyncio.StreamReader]
     socket_writer: Optional[asyncio.StreamWriter]
     room: Optional[Room]
+    host: Optional[str]
+    port: Optional[int]
 
     def __init__(self, room: Room):
         self._vehicle_history = collections.defaultdict(list)
@@ -220,6 +233,8 @@ class VehicleTracker:
         self.socket_reader = None
         self.socket_writer = None
         self._room = room
+        self.host = None
+        self.port = None
 
     def update_history(self, vehicle_id: int, obj: TrackedObject):
         self._vehicle_history[vehicle_id].append(obj)
@@ -234,6 +249,9 @@ class VehicleTracker:
     async def connect(self, host: str, port: int):
         if self.fake_mode:
             return
+
+        self.host = host
+        self.port = port
 
         try:
             self.socket_reader, self.socket_writer = await asyncio.open_connection(host, port)
@@ -253,26 +271,38 @@ class VehicleTracker:
         self.socket_reader = None
 
     async def listen(self):
+        new_time = datetime.now()
+        next_loc = None
         while True:
-            if self.fake_mode is False:
-                data = await self.socket_reader.read(2048)
-                received = np.frombuffer(data)
-                received = received.reshape((len(received) / 6, 6))
-                print(received)
-                # TODO populate object_data
-                object_data = {}
-            else:
-                new_loc = (random.randint(-200, 200), 300 + random.randint(-200, 200))
-                object_data = {
-                    1: TrackedObject(location=(450, 300), rotation=0, vel=(0, 0), obj_type=ObjectType.CAR),
-                    2: TrackedObject(location=new_loc, rotation=0, vel=(0, 0), obj_type=ObjectType.PERSON)
-                }
+            try:
+                prev_time = new_time
+                new_time = datetime.now()
+                elapsed = (new_time - prev_time).total_seconds()
+                if self.fake_mode is False:
+                    data = await self.socket_reader.read(2048)
+                    received = np.frombuffer(data)
+                    received = received.reshape((len(received) // 7, 7))
+                    received_pairs = [TrackedObject.from_np(row) for row in received]
+                    object_data = {obj_id: obj for (obj_id, obj) in received_pairs}
+                else:
+                    new_loc = next_loc or (200 + random.randint(-100, 100), 300 + random.randint(-100, 100))
+                    next_loc = (200 + random.randint(-100, 100), 300 + random.randint(-100, 100))
+                    diff = ((next_loc[0] - new_loc[0]) / elapsed, (next_loc[1] - new_loc[1]) / elapsed)
+                    object_data = {
+                        1: TrackedObject(location=(450, 300), rotation=0, vel=(0, 0), obj_type=ObjectType.CAR),
+                        2: TrackedObject(location=new_loc, rotation=0, vel=diff, obj_type=ObjectType.PERSON)
+                    }
 
-            for k, obj in object_data.items():
-                self.update_history(k, obj)
+                for k, obj in object_data.items():
+                    self.update_history(k, obj)
 
-            await self._room.broadcast_tracking(self.current_vehicles)
-            await asyncio.sleep(0.1)
+                await self._room.broadcast_tracking(self.current_vehicles, elapsed)
+                await asyncio.sleep(0.2)
+            except Exception as e:
+                logger.error("Socket read failed:", e)
+                # Attempt to reconnect
+                await self.close()
+                await self.connect(self.host, self.port)
 
 
 async def init_tracker():
