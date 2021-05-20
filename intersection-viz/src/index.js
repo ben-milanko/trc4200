@@ -38,8 +38,8 @@ function makeSprite(label) {
     };
     const newSprite = label_mapping[label]();
     newSprite.anchor.set(0.5); // We want to rotate our sprite relative to the center, so 0.5
-    newSprite.width *= 0.05;
-    newSprite.height *= 0.05;
+    newSprite.width *= 0.02;
+    newSprite.height *= 0.02;
     return newSprite;
 }
 
@@ -60,13 +60,13 @@ function updateOrCreateSprite(id, data) {
 // Load the logo
 app.loader.add("car_red", car_red);
 app.loader.load(() => {
-    app.renderer.resize(app.renderer.width, app.renderer.height);
-
     // draw background
     app.stage.addChild(bgSprite);
 
+    app.renderer.resize(app.renderer.width, app.renderer.height);
+
     // websocket setup
-    const ws = new WebSocket("ws://localhost:8000/stream");
+    const ws = new WebSocket(`ws://${window.location.host}:8000/stream`);
     ws.onmessage = (ev) => {
         let ev_data = JSON.parse(ev.data);
 
