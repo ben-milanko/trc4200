@@ -236,7 +236,7 @@ class VehicleTracker:
 
     def __init__(self, room: Room):
         self._vehicle_history = collections.defaultdict(list)
-        self.fake_mode = True
+        self.fake_mode = False
         self.socket_reader = None
         self.socket_writer = None
         self._room = room
@@ -265,8 +265,9 @@ class VehicleTracker:
             self.socket_writer.write(bytes("", "utf-8"))
             await self.socket_writer.drain()
         except socket.error:
-            logger.warning("Not able to connect. Using fake data")
-            self.fake_mode = True
+            pass
+            # logger.warning("Not able to connect. Using fake data")
+            # self.fake_mode = True
 
     async def close(self):
         if self.fake_mode:
