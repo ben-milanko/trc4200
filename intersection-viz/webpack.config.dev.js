@@ -6,8 +6,7 @@ module.exports = {
     devServer: {
         static: "resources",
         port: 5178,
-        host: "0.0.0.0",
-        public: "lasagne.xyz"
+        host: "0.0.0.0"
     },
     module: {
         rules: [{

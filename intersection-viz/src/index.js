@@ -1,7 +1,8 @@
 import {Application} from "@pixi/app";
-import {BatchRenderer, Renderer} from "@pixi/core";
+import {BatchRenderer, Renderer, RenderTexture, Texture} from "@pixi/core";
 import {TickerPlugin} from "@pixi/ticker";
 import {AppLoaderPlugin} from "@pixi/loaders";
+import {BlurFilter} from "@pixi/filter-blur";
 import {Sprite} from "@pixi/sprite";
 import * as settings from "@pixi/settings";
 
@@ -20,6 +21,7 @@ displayHolder.appendChild(app.view); // Create Canvas tag in the body
 
 let detections = {};
 let sprites = {};
+let heatMapSprites = [];
 const SPRITE_TIMEOUT_MS = 500;
 const bgSprite = Sprite.from(aerial);
 
@@ -43,6 +45,32 @@ function makeSprite(label) {
     return newSprite;
 }
 
+function makeBlurTex() {
+    const W1 = 80;
+    const H1 = 80;
+    const W2 = 40;
+    const H2 = 40;
+
+    let tex = RenderTexture.create({width: W1, height: H1});
+    let spr = new Sprite(Texture.WHITE);
+    spr.tint = 0xff7300;  // orange
+    spr.anchor.set(0.5);
+    spr.width = W2;
+    spr.height = H2;
+    spr.position.set(W1 / 2, H1 / 2);
+    spr.filters = [new BlurFilter(15)];
+    app.renderer.render(spr, tex);
+    return tex;
+}
+
+function makeBlurSprite(alpha) {
+    let tex = makeBlurTex();
+    let spr = new Sprite(tex);
+    spr.alpha = alpha;
+    return spr;
+}
+
+
 function updateOrCreateSprite(id, data) {
     if (!(id in sprites)) {
         // create new sprite
@@ -57,6 +85,25 @@ function updateOrCreateSprite(id, data) {
     return sp;
 }
 
+function drawHeatMap() {
+    // clear last heatmap
+    for (let sp of heatMapSprites) {
+        app.stage.removeChild(sp);
+    }
+    heatMapSprites = [];
+
+    for (let [id, obj] of Object.entries(detections)) {
+        let blurSprite = makeBlurSprite(0.8);
+        blurSprite.x = obj.x;
+        blurSprite.y = obj.y;
+        blurSprite.height = 100;
+        blurSprite.width = 100;
+        app.stage.addChild(blurSprite);
+        heatMapSprites.push(blurSprite);
+    }
+    console.log(heatMapSprites);
+}
+
 // Load the logo
 app.loader.add("car_red", car_red);
 app.loader.load(() => {
@@ -66,7 +113,7 @@ app.loader.load(() => {
     app.renderer.resize(app.renderer.width, app.renderer.height);
 
     // websocket setup
-    const ws = new WebSocket(`ws://${window.location.host}:8000/stream`);
+    const ws = new WebSocket(`ws://${window.location.hostname}:8000/stream`);
     ws.onmessage = (ev) => {
         let ev_data = JSON.parse(ev.data);
 
@@ -96,6 +143,7 @@ app.loader.load(() => {
             sp.x += xVel * ms / 1000;
             sp.y += yVel * ms / 1000;
         }
+        drawHeatMap();
     };
 
     // Put the rotating function into the update loop
