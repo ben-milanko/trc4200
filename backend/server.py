@@ -47,8 +47,8 @@ class TrackedObject:
     def from_np(cls, np_array: np.array):
         [obj_id, x, y, rot, speed, typ, t_stamp] = np_array
         vel = (speed * math.cos(rot), -speed * math.sin(rot))
-        return obj_id, cls(obj_type=ObjectType(int(typ)), location=(int(x), int(y)), vel=vel,
-                           rotation=math.pi / 2 - rot)
+        return int(obj_id), cls(obj_type=ObjectType(int(typ)), location=(int(x), int(y)), vel=vel,
+                                rotation=math.pi / 2 - rot)
 
 
 class Room:

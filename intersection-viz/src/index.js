@@ -1,6 +1,5 @@
 import {Application} from "@pixi/app";
 import {BatchRenderer, Renderer} from "@pixi/core";
-import {Container} from "@pixi/display";
 import {TickerPlugin} from "@pixi/ticker";
 import {AppLoaderPlugin} from "@pixi/loaders";
 import {Sprite} from "@pixi/sprite";
@@ -17,7 +16,6 @@ Application.registerPlugin(AppLoaderPlugin);
 // App with width and height of the page
 const displayHolder = document.querySelector("#display");
 const app = new Application({resizeTo: displayHolder, resizeThrottle: 100});
-const container = new Container();
 displayHolder.appendChild(app.view); // Create Canvas tag in the body
 
 let detections = {};
@@ -49,25 +47,23 @@ function updateOrCreateSprite(id, data) {
     if (!(id in sprites)) {
         // create new sprite
         let s = makeSprite(data.objType);
-        container.addChild(s);
+        app.stage.addChild(s);
         sprites[id] = s;
     }
     let sp = sprites[id];
     [sp.x, sp.y] = data.location;
     sp.rotation = data.rotation;
     sp.lastUpdated = Date.now();
-    // TODO: handle velocity
     return sp;
 }
 
 // Load the logo
 app.loader.add("car_red", car_red);
 app.loader.load(() => {
-    app.stage.addChild(container);
     app.renderer.resize(app.renderer.width, app.renderer.height);
 
     // draw background
-    container.addChild(bgSprite);
+    app.stage.addChild(bgSprite);
 
     // websocket setup
     const ws = new WebSocket("ws://localhost:8000/stream");
@@ -90,7 +86,8 @@ app.loader.load(() => {
         for (let [id, sp] of Object.entries(sprites)) {
             // remove old sprites
             if (Date.now() - sp.lastUpdated > SPRITE_TIMEOUT_MS) {
-                container.removeChild(sp);
+                console.warn("removed child");
+                app.stage.removeChild(sp);
                 delete sprites[id];
             }
 
@@ -107,5 +104,5 @@ app.loader.load(() => {
 
 app.renderer.on("resize", (width, height) => {
     let scale = Math.min(height / bgSprite.height, width / bgSprite.width);
-    container.setTransform((width - bgSprite.width * scale) / 2, 0, scale, scale);
+    app.stage.setTransform((width - bgSprite.width * scale) / 2, 0, scale, scale);
 });
