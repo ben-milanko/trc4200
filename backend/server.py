@@ -42,13 +42,19 @@ class TrackedObject:
     rotation: int
     vel: Tuple[float, float]
     obj_type: ObjectType
+    x_coeffs: Tuple[float, float, float, float]
+    y_coeffs: Tuple[float, float, float, float]
+
+    NP_ARRAY_SIZE = 15
 
     @classmethod
     def from_np(cls, np_array: np.array):
-        [obj_id, x, y, rot, speed, typ, t_stamp] = np_array
-        vel = (speed * math.cos(rot), -speed * math.sin(rot))
-        return int(obj_id), cls(obj_type=ObjectType(int(typ)), location=(int(x), int(y)), vel=vel,
-                                rotation=math.pi / 2 - rot)
+        pos_scale = 0.25
+        [obj_id, x, y, rot, speed, typ, t_stamp, xa, xb, xc, xd, ya, yb, yc, yd] = np_array
+        vel = (speed * math.cos(rot) * pos_scale, -speed * math.sin(rot) * pos_scale)
+        return int(obj_id), cls(obj_type=ObjectType(int(typ)), location=(int(x * pos_scale), int(y * pos_scale)),
+                                vel=vel, rotation=math.pi / 2 - rot,
+                                x_coeffs=(xa, xb, xc, xd), y_coeffs=(ya, yb, yc, yd))
 
 
 class Room:
@@ -230,7 +236,7 @@ class VehicleTracker:
 
     def __init__(self, room: Room):
         self._vehicle_history = collections.defaultdict(list)
-        self.fake_mode = False
+        self.fake_mode = True
         self.socket_reader = None
         self.socket_writer = None
         self._room = room
@@ -272,6 +278,9 @@ class VehicleTracker:
         self.socket_reader = None
 
     async def listen(self):
+        packet_size = 2048
+        max_size = ((packet_size // 8) // TrackedObject.NP_ARRAY_SIZE) * TrackedObject.NP_ARRAY_SIZE
+
         new_time = datetime.now()
         next_loc = None
         while True:
@@ -280,9 +289,11 @@ class VehicleTracker:
                 new_time = datetime.now()
                 elapsed = (new_time - prev_time).total_seconds() or 0.1
                 if self.fake_mode is False:
-                    data = await self.socket_reader.read(2048)
+                    data = await self.socket_reader.read(packet_size)
                     received = np.frombuffer(data)
-                    received = received.reshape((len(received) // 7, 7))
+                    received = received[0:min(max_size, len(received))]
+                    received = received.reshape(
+                        (len(received) // TrackedObject.NP_ARRAY_SIZE, TrackedObject.NP_ARRAY_SIZE))
                     received_pairs = [TrackedObject.from_np(row) for row in received]
                     object_data = {obj_id: obj for (obj_id, obj) in received_pairs}
                 else:
@@ -290,8 +301,10 @@ class VehicleTracker:
                     next_loc = (200 + random.randint(-100, 100), 300 + random.randint(-100, 100))
                     diff = ((next_loc[0] - new_loc[0]) / elapsed, (next_loc[1] - new_loc[1]) / elapsed)
                     object_data = {
-                        1: TrackedObject(location=(450, 300), rotation=0, vel=(0, 0), obj_type=ObjectType.CAR),
-                        2: TrackedObject(location=new_loc, rotation=0, vel=diff, obj_type=ObjectType.PERSON)
+                        1: TrackedObject(location=(450, 300), rotation=0, vel=(0, 0), obj_type=ObjectType.CAR,
+                                         x_coeffs=(0, 0, 0, 0), y_coeffs=(0, 0, 0, 0)),
+                        2: TrackedObject(location=new_loc, rotation=0, vel=diff, obj_type=ObjectType.PERSON,
+                                         x_coeffs=(0, 0, 0, 0), y_coeffs=(0, 0, 0, 0))
                     }
 
                 for k, obj in object_data.items():
@@ -305,6 +318,9 @@ class VehicleTracker:
                 await self.close()
                 await self.connect(self.host, self.port)
                 logger.warning("Reconnected.")
+            except ValueError:
+                logger.exception("Invalid data received.")
+                await asyncio.sleep(0.2)
 
 
 async def init_tracker():
