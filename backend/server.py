@@ -42,19 +42,20 @@ class TrackedObject:
     rotation: int
     vel: Tuple[float, float]
     obj_type: ObjectType
-    x_coeffs: Tuple[float, float, float, float]
-    y_coeffs: Tuple[float, float, float, float]
+    x_coeffs: Tuple[float, float, float]
+    y_coeffs: Tuple[float, float, float]
+    timestamp: float
 
-    NP_ARRAY_SIZE = 15
+    NP_ARRAY_SIZE = 13
 
     @classmethod
     def from_np(cls, np_array: np.array):
         pos_scale = 0.25
-        [obj_id, x, y, rot, speed, typ, t_stamp, xa, xb, xc, xd, ya, yb, yc, yd] = np_array
+        [obj_id, x, y, rot, speed, typ, t_stamp, xa, xb, xc, ya, yb, yc] = np_array
         vel = (speed * math.cos(rot) * pos_scale, -speed * math.sin(rot) * pos_scale)
         return int(obj_id), cls(obj_type=ObjectType(int(typ)), location=(int(x * pos_scale), int(y * pos_scale)),
-                                vel=vel, rotation=math.pi / 2 - rot,
-                                x_coeffs=(xa, xb, xc, xd), y_coeffs=(ya, yb, yc, yd))
+                                timestamp=t_stamp, vel=vel, rotation=math.pi / 2 - rot,
+                                x_coeffs=(xa, xb, xc), y_coeffs=(ya, yb, yc))
 
 
 class Room:
@@ -224,7 +225,8 @@ class Stream(WebSocketEndpoint):
 
 
 class VehicleTracker:
-    MAX_HISTORY_POINTS = 10
+    MAX_HISTORY_POINTS = 3
+    VEHICLE_TIMEOUT_S = 0.5
 
     _vehicle_history: Dict[int, List[TrackedObject]]
     fake_mode: bool
@@ -248,6 +250,12 @@ class VehicleTracker:
         if len(self._vehicle_history[vehicle_id]) > self.MAX_HISTORY_POINTS:
             # remove old point
             self._vehicle_history[vehicle_id].pop(0)
+
+    def apply_timeout(self, timestamp: float):
+        for k in list(self._vehicle_history.keys()):
+            vehicles = self._vehicle_history[k]
+            if timestamp - vehicles[-1].timestamp > self.VEHICLE_TIMEOUT_S:
+                self._vehicle_history.pop(k)
 
     @property
     def current_vehicles(self) -> Dict[int, TrackedObject]:
@@ -279,7 +287,7 @@ class VehicleTracker:
         self.socket_reader = None
 
     async def listen(self):
-        packet_size = 2048
+        packet_size = 4096
         max_size = ((packet_size // 8) // TrackedObject.NP_ARRAY_SIZE) * TrackedObject.NP_ARRAY_SIZE
 
         new_time = datetime.now()
@@ -303,16 +311,18 @@ class VehicleTracker:
                     diff = ((next_loc[0] - new_loc[0]) / elapsed, (next_loc[1] - new_loc[1]) / elapsed)
                     object_data = {
                         1: TrackedObject(location=(450, 300), rotation=0, vel=(0, 0), obj_type=ObjectType.CAR,
-                                         x_coeffs=(0, 0, 0, 0), y_coeffs=(0, 0, 0, 0)),
+                                         x_coeffs=(0, 0, 0), y_coeffs=(0, 0, 0), timestamp=0),
                         2: TrackedObject(location=new_loc, rotation=0, vel=diff, obj_type=ObjectType.PERSON,
-                                         x_coeffs=(0, 0, 0, 0), y_coeffs=(0, 0, 0, 0))
+                                         x_coeffs=(0, 0, 0), y_coeffs=(0, 0, 0), timestamp=0)
                     }
 
                 for k, obj in object_data.items():
                     self.update_history(k, obj)
 
+                self.apply_timeout(next(iter(object_data.values())).timestamp)
+
                 await self._room.broadcast_tracking(self.current_vehicles, elapsed)
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.02)
             except websockets.exceptions.ConnectionClosed:
                 logger.exception("A client connection was interrupted. Reconnecting...")
                 # Attempt to reconnect
@@ -320,8 +330,9 @@ class VehicleTracker:
                 await self.connect(self.host, self.port)
                 logger.warning("Reconnected.")
             except ValueError:
-                logger.exception("Invalid data received.")
-                await asyncio.sleep(0.2)
+                # logger.exception("Invalid data received.")
+                continue
+                await asyncio.sleep(0.02)
 
 
 async def init_tracker():

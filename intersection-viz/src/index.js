@@ -92,16 +92,16 @@ function drawHeatMap() {
     }
     heatMapSprites = [];
 
-    for (let [id, obj] of Object.entries(detections)) {
-        let blurSprite = makeBlurSprite(0.8);
-        blurSprite.x = obj.x;
-        blurSprite.y = obj.y;
-        blurSprite.height = 100;
-        blurSprite.width = 100;
-        app.stage.addChild(blurSprite);
-        heatMapSprites.push(blurSprite);
-    }
-    console.log(heatMapSprites);
+    // for (let [id, obj] of Object.entries(detections)) {
+    //     let blurSprite = makeBlurSprite(0.8);
+    //     blurSprite.x = obj.x;
+    //     blurSprite.y = obj.y;
+    //     blurSprite.height = 100;
+    //     blurSprite.width = 100;
+    //     app.stage.addChild(blurSprite);
+    //     heatMapSprites.push(blurSprite);
+    // }
+    // console.log(heatMapSprites);
 }
 
 // Load the logo
@@ -132,10 +132,11 @@ app.loader.load(() => {
         const ms = delta / settings.settings.TARGET_FPMS;
         for (let [id, sp] of Object.entries(sprites)) {
             // remove old sprites
-            if (Date.now() - sp.lastUpdated > SPRITE_TIMEOUT_MS) {
-                console.warn("removed child");
+            if (Date.now() - sp.lastUpdated > SPRITE_TIMEOUT_MS || !(id in detections)) {
+                // console.warn("removed child");
                 app.stage.removeChild(sp);
                 delete sprites[id];
+                continue;
             }
 
             // animate sprites on tick
