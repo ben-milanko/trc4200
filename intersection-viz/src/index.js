@@ -133,7 +133,6 @@ app.loader.load(() => {
         for (let [id, sp] of Object.entries(sprites)) {
             // remove old sprites
             if (Date.now() - sp.lastUpdated > SPRITE_TIMEOUT_MS || !(id in detections)) {
-                // console.warn("removed child");
                 app.stage.removeChild(sp);
                 delete sprites[id];
                 continue;

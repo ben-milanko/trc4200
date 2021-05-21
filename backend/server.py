@@ -50,10 +50,13 @@ class TrackedObject:
 
     @classmethod
     def from_np(cls, np_array: np.array):
-        pos_scale = 0.25
-        [obj_id, x, y, rot, speed, typ, t_stamp, xa, xb, xc, ya, yb, yc] = np_array
+        pos_scale = 0.18
+        x_offset = 290
+        y_offset = 320
+        [obj_id, x, y, rot, speed, typ, t_stamp, xa, xb, xc, ya, yb, yc] = map(float, np_array)
         vel = (speed * math.cos(rot) * pos_scale, -speed * math.sin(rot) * pos_scale)
-        return int(obj_id), cls(obj_type=ObjectType(int(typ)), location=(int(x * pos_scale), int(y * pos_scale)),
+        return int(obj_id), cls(obj_type=ObjectType(int(typ)),
+                                location=(int(x * pos_scale) + x_offset, int(y * pos_scale) + y_offset),
                                 timestamp=t_stamp, vel=vel, rotation=math.pi / 2 - rot,
                                 x_coeffs=(xa, xb, xc), y_coeffs=(ya, yb, yc))
 
@@ -226,7 +229,7 @@ class Stream(WebSocketEndpoint):
 
 class VehicleTracker:
     MAX_HISTORY_POINTS = 3
-    VEHICLE_TIMEOUT_S = 0.5
+    VEHICLE_TIMEOUT_S = 0.8
 
     _vehicle_history: Dict[int, List[TrackedObject]]
     fake_mode: bool
@@ -273,9 +276,8 @@ class VehicleTracker:
             self.socket_writer.write(bytes("", "utf-8"))
             await self.socket_writer.drain()
         except socket.error:
-            pass
-            # logger.warning("Not able to connect. Using fake data")
-            # self.fake_mode = True
+            logger.warning("Not able to connect. Using fake data")
+            self.fake_mode = True
 
     async def close(self):
         if self.fake_mode:
@@ -299,7 +301,7 @@ class VehicleTracker:
                 elapsed = (new_time - prev_time).total_seconds() or 0.1
                 if self.fake_mode is False:
                     data = await self.socket_reader.read(packet_size)
-                    received = np.frombuffer(data)
+                    received = np.frombuffer(data, dtype=np.float32)
                     received = received[0:min(max_size, len(received))]
                     received = received.reshape(
                         (len(received) // TrackedObject.NP_ARRAY_SIZE, TrackedObject.NP_ARRAY_SIZE))
@@ -330,8 +332,7 @@ class VehicleTracker:
                 await self.connect(self.host, self.port)
                 logger.warning("Reconnected.")
             except ValueError:
-                # logger.exception("Invalid data received.")
-                continue
+                logger.exception("Invalid data received.")
                 await asyncio.sleep(0.02)
 
 
