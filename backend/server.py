@@ -3,21 +3,20 @@ import collections
 import enum
 import logging
 import math
+import numpy as np
 import random
 import socket
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Dict, List, Optional, Tuple
-
-import numpy as np
 import websockets.exceptions
+from dataclasses import dataclass
 from dataclasses_json import dataclass_json, LetterCase
+from datetime import datetime
 from starlette.applications import Starlette
 from starlette.endpoints import WebSocketEndpoint
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route, WebSocketRoute
 from starlette.types import ASGIApp, Scope, Receive, Send
 from starlette.websockets import WebSocket
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +132,9 @@ class Room:
                 {"type": "MESSAGE", "data": {"user_id": user_id, "msg": msg}}
             )
 
-    async def broadcast_tracking(self, objects: Dict[int, TrackedObject], tick_time: float):
+    async def broadcast_tracking(self, objects: Dict[int, TrackedObject], tick_time: float, delay_s: float = 0):
+        if delay_s:
+            await asyncio.sleep(delay_s)
         for websocket in self._users.values():
             await websocket.send_json(
                 {"type": "TRACKING", "data": {k: o.to_dict() for k, o in objects.items()},
@@ -247,6 +248,7 @@ class VehicleTracker:
         self._room = room
         self.host = None
         self.port = None
+        self._task_references = set()
 
     def update_history(self, vehicle_id: int, obj: TrackedObject):
         self._vehicle_history[vehicle_id].append(obj)
@@ -323,7 +325,11 @@ class VehicleTracker:
 
                 self.apply_timeout(next(iter(object_data.values())).timestamp)
 
-                await self._room.broadcast_tracking(self.current_vehicles, elapsed)
+                bc_task = asyncio.create_task(
+                    self._room.broadcast_tracking(self.current_vehicles, elapsed, delay_s=3.3))
+                self._task_references.add(bc_task)
+                bc_task.add_done_callback(lambda f: self._task_references.remove(f))
+
                 await asyncio.sleep(0.02)
             except websockets.exceptions.ConnectionClosed:
                 logger.exception("A client connection was interrupted. Reconnecting...")
