@@ -3,20 +3,21 @@ import collections
 import enum
 import logging
 import math
-import numpy as np
 import random
 import socket
-import websockets.exceptions
 from dataclasses import dataclass
-from dataclasses_json import dataclass_json, LetterCase
 from datetime import datetime
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+import websockets.exceptions
+from dataclasses_json import dataclass_json, LetterCase
 from starlette.applications import Starlette
 from starlette.endpoints import WebSocketEndpoint
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route, WebSocketRoute
 from starlette.types import ASGIApp, Scope, Receive, Send
 from starlette.websockets import WebSocket
-from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +50,9 @@ class TrackedObject:
 
     @classmethod
     def from_np(cls, np_array: np.array):
-        pos_scale = 0.18
-        x_offset = 290
-        y_offset = 320
+        pos_scale = 1062 / 1280
+        x_offset = 0
+        y_offset = 0
         [obj_id, x, y, rot, speed, typ, t_stamp, xa, xb, xc, ya, yb, yc] = map(float, np_array)
         vel = (speed * math.cos(rot) * pos_scale, -speed * math.sin(rot) * pos_scale)
         return int(obj_id), cls(obj_type=ObjectType(int(typ)),
@@ -277,7 +278,8 @@ class VehicleTracker:
             self.socket_reader, self.socket_writer = await asyncio.open_connection(host, port)
             self.socket_writer.write(bytes("", "utf-8"))
             await self.socket_writer.drain()
-        except socket.error:
+        except socket.error as e:
+            print(e)
             logger.warning("Not able to connect. Using fake data")
             self.fake_mode = True
 
@@ -319,7 +321,6 @@ class VehicleTracker:
                         2: TrackedObject(location=new_loc, rotation=0, vel=diff, obj_type=ObjectType.PERSON,
                                          x_coeffs=(0, 0, 0), y_coeffs=(0, 0, 0), timestamp=0)
                     }
-
                 for k, obj in object_data.items():
                     self.update_history(k, obj)
 
