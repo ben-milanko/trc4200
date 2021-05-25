@@ -55,8 +55,8 @@ cv2.setMouseCallback(reference_window_name, on_click_ref)
 aerial_image = cv2.imread('aerial.png')
 target_width = 1280
 scale = 1280 / aerial_image.shape[1]
-scaled_shape = (int(aerial_image.shape[0] * scale),
-                int(aerial_image.shape[1] * scale))
+scaled_shape = (int(aerial_image.shape[1] * scale),
+                int(aerial_image.shape[0] * scale))
 print(scaled_shape)
 aerial_image = cv2.resize(aerial_image, scaled_shape)
 
@@ -84,6 +84,7 @@ while True:
         homography, mask = cv2.findHomography(src_pts, dst_pts)
     if homography is not None:
         transformed = cv2.warpPerspective(frame, homography, scaled_shape)
+        transformed = cv2.addWeighted(transformed, 0.5, aerial_image, 0.5, 0.0)
         cv2.imshow('trans', transformed)
 
     key_val = cv2.waitKey(20)
