@@ -8,6 +8,7 @@ import * as settings from "@pixi/settings";
 
 import car_red from "../resources/assets/car_red.png";
 import pedestrian from "../resources/assets/pedestrian.png";
+import truck from "../resources/assets/truck.png";
 import aerial from "../resources/assets/aerial.png";
 
 Renderer.registerPlugin("batch", BatchRenderer);
@@ -32,7 +33,7 @@ function makeSprite(label) {
         2: () => Sprite.from(car_red),
         3: () => Sprite.from("motorcycle"),
         5: () => Sprite.from("bus"),
-        7: () => Sprite.from("truck"),
+        7: () => Sprite.from(truck),
         9: () => Sprite.from("traffic_light"),
         10: () => Sprite.from("fire_hydrant"),
         11: () => Sprite.from("stop_sign"),
@@ -110,8 +111,6 @@ app.loader.load(() => {
     // draw background
     app.stage.addChild(bgSprite);
 
-    app.renderer.resize(app.renderer.width, app.renderer.height);
-
     // websocket setup
     const ws = new WebSocket(`ws://${window.location.hostname}:8000/stream`);
     ws.onmessage = (ev) => {
@@ -127,6 +126,8 @@ app.loader.load(() => {
             updateOrCreateSprite(id, obj);
         }
     };
+
+    app.renderer.resize(app.renderer.width, app.renderer.height);
 
     const carUpdate = function (delta) {
         const ms = delta / settings.settings.TARGET_FPMS;
