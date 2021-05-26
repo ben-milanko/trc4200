@@ -69,6 +69,7 @@ class Room:
     def __init__(self):
         logger.info("Creating new empty room")
         self._users: Dict[str, WebSocket] = {}
+        self.backend_reconnect_pending = False
 
     def __len__(self) -> int:
         """Get the number of users in the room.
@@ -136,11 +137,18 @@ class Room:
     async def broadcast_tracking(self, objects: Dict[int, TrackedObject], tick_time: float, delay_s: float = 0):
         if delay_s:
             await asyncio.sleep(delay_s)
-        for websocket in self._users.values():
-            await websocket.send_json(
-                {"type": "TRACKING", "data": {k: o.to_dict() for k, o in objects.items()},
-                 "tickTime": tick_time}
-            )
+        for user_id, websocket in self._users.items():
+            try:
+                await websocket.send_json(
+                    {"type": "TRACKING", "data": {k: o.to_dict() for k, o in objects.items()},
+                     "tickTime": tick_time}
+                )
+            except websockets.exceptions.ConnectionClosed:
+                # client has died, just remove it
+                try:
+                    self.remove_user(user_id)
+                except ValueError:
+                    pass
 
     async def broadcast_user_joined(self, user_id: str):
         """Broadcast message to all connected users.
@@ -213,6 +221,7 @@ class Stream(WebSocketEndpoint):
         )
         await self.room.broadcast_user_joined(self.user_id)
         self.room.add_user(self.user_id, websocket)
+        self.room.backend_reconnect_pending = True
 
     async def on_disconnect(self, _websocket: WebSocket, _close_code: int):
         """Disconnect the user, removing them from the :class:`~.Room`, and
@@ -237,7 +246,7 @@ class VehicleTracker:
     fake_mode: bool
     socket_reader: Optional[asyncio.StreamReader]
     socket_writer: Optional[asyncio.StreamWriter]
-    room: Optional[Room]
+    _room: Optional[Room]
     host: Optional[str]
     port: Optional[int]
 
@@ -268,9 +277,6 @@ class VehicleTracker:
         return {key: objs[-1] for key, objs in self._vehicle_history.items()}
 
     async def connect(self, host: str, port: int):
-        if self.fake_mode:
-            return
-
         self.host = host
         self.port = port
 
@@ -279,16 +285,13 @@ class VehicleTracker:
             self.socket_writer.write(bytes("", "utf-8"))
             await self.socket_writer.drain()
         except socket.error as e:
-            print(e)
-            logger.warning("Not able to connect. Using fake data")
+            logger.warning(f"Not able to connect. Using fake data (\"{e}\")")
             self.fake_mode = True
 
     async def close(self):
-        if self.fake_mode:
-            return
-
-        self.socket_writer.close()
-        await self.socket_writer.wait_closed()
+        if not self.fake_mode:
+            self.socket_writer.close()
+            await self.socket_writer.wait_closed()
         self.socket_writer = None
         self.socket_reader = None
 
@@ -300,6 +303,11 @@ class VehicleTracker:
         next_loc = None
         while True:
             try:
+                if self._room.backend_reconnect_pending is True:
+                    logger.warning("Triggering reconnect...")
+                    self._room.backend_reconnect_pending = False
+                    raise websockets.WebSocketException()
+
                 prev_time = new_time
                 new_time = datetime.now()
                 elapsed = (new_time - prev_time).total_seconds() or 0.1
@@ -332,8 +340,8 @@ class VehicleTracker:
                 bc_task.add_done_callback(lambda f: self._task_references.remove(f))
 
                 await asyncio.sleep(0.02)
-            except websockets.exceptions.ConnectionClosed:
-                logger.exception("A client connection was interrupted. Reconnecting...")
+            except websockets.WebSocketException:
+                logger.warning("A client connection was interrupted. Reconnecting...")
                 # Attempt to reconnect
                 await self.close()
                 await self.connect(self.host, self.port)
