@@ -281,17 +281,22 @@ class VehicleTracker:
         self.port = port
 
         try:
-            self.socket_reader, self.socket_writer = await asyncio.open_connection(host, port)
+            fut = asyncio.open_connection(host, port)
+            self.socket_reader, self.socket_writer = await asyncio.wait_for(fut, timeout=1.5)
             self.socket_writer.write(bytes("", "utf-8"))
             await self.socket_writer.drain()
+            self.fake_mode = False
         except socket.error as e:
             logger.warning(f"Not able to connect. Using fake data (\"{e}\")")
+            self.fake_mode = True
+        except asyncio.TimeoutError:
+            logger.warning(f"Connection to {host}:{port} timed out. Using fake data.")
             self.fake_mode = True
 
     async def close(self):
         if not self.fake_mode:
             self.socket_writer.close()
-            await self.socket_writer.wait_closed()
+            # await self.socket_writer.wait_closed()
         self.socket_writer = None
         self.socket_reader = None
 
