@@ -337,7 +337,11 @@ class VehicleTracker:
                 for k, obj in object_data.items():
                     self.update_history(k, obj)
 
-                self.apply_timeout(next(iter(object_data.values())).timestamp)
+                try:
+                    last_timestamp = next(iter(object_data.values())).timestamp
+                    self.apply_timeout(last_timestamp)
+                except StopIteration:
+                    pass
 
                 bc_task = asyncio.create_task(
                     self._room.broadcast_tracking(self.current_vehicles, elapsed, delay_s=3.3))
